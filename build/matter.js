@@ -1,5 +1,5 @@
 /**
-* matter-js 0.14.1 by @liabru 2018-01-10
+* matter-js 0.14.1 by @liabru 2018-06-09
 * http://brm.io/matter-js/
 * License MIT
 */
@@ -28,7 +28,7 @@
  * THE SOFTWARE.
  */
 
-(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.Matter = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
+(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.Matter = f()}})(function(){var define,module,exports;return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(_dereq_,module,exports){
 /**
 * The `Matter.Body` module contains methods for creating and manipulating body models.
 * A `Matter.Body` is a rigid body that can be simulated by a `Matter.Engine`.
@@ -79,6 +79,7 @@ var Axes = _dereq_('../geometry/Axes');
             position: { x: 0, y: 0 },
             force: { x: 0, y: 0 },
             torque: 0,
+            gravityScale: 1,
             positionImpulse: { x: 0, y: 0 },
             constraintImpulse: { x: 0, y: 0, angle: 0 },
             totalContacts: 0,
@@ -465,6 +466,16 @@ var Axes = _dereq_('../geometry/Axes');
     };
 
     /**
+     * Sets the gravity scale of the body
+     * @method setAngle
+     * @param {body} body
+     * @param {number} scale
+     */
+    Body.setGravityScale = function (body, scale) {
+        body.gravityScale = scale
+    };
+
+    /**
      * Sets the angle of the body instantly. Angular velocity, position, force etc. are unchanged.
      * @method setAngle
      * @param {body} body
@@ -628,8 +639,8 @@ var Axes = _dereq_('../geometry/Axes');
             velocityPrevY = body.position.y - body.positionPrev.y;
 
         // update velocity with Verlet integration
-        body.velocity.x = (velocityPrevX * frictionAir * correction) + (body.force.x / body.mass) * deltaTimeSquared;
-        body.velocity.y = (velocityPrevY * frictionAir * correction) + (body.force.y / body.mass) * deltaTimeSquared;
+        body.velocity.x = (velocityPrevX * frictionAir * correction) + (body.force.x / body.mass) * deltaTimeSquared * body.gravityScale;
+        body.velocity.y = (velocityPrevY * frictionAir * correction) + (body.force.y / body.mass) * deltaTimeSquared * body.gravityScale;
 
         body.positionPrev.x = body.position.x;
         body.positionPrev.y = body.position.y;
@@ -8330,12 +8341,12 @@ Matter.Engine.run = Matter.Runner.run;
 
 },{"../body/Body":1,"../body/Composite":2,"../body/World":3,"../collision/Contact":4,"../collision/Detector":5,"../collision/Grid":6,"../collision/Pair":7,"../collision/Pairs":8,"../collision/Query":9,"../collision/Resolver":10,"../collision/SAT":11,"../constraint/Constraint":12,"../constraint/MouseConstraint":13,"../core/Common":14,"../core/Engine":15,"../core/Events":16,"../core/Matter":17,"../core/Metrics":18,"../core/Mouse":19,"../core/Plugin":20,"../core/Runner":21,"../core/Sleeping":22,"../factory/Bodies":23,"../factory/Composites":24,"../geometry/Axes":25,"../geometry/Bounds":26,"../geometry/Svg":27,"../geometry/Vector":28,"../geometry/Vertices":29,"../render/Render":31,"../render/RenderPixi":32}],31:[function(_dereq_,module,exports){
 /**
-* The `Matter.Render` module is a simple HTML5 canvas based renderer for visualising instances of `Matter.Engine`.
-* It is intended for development and debugging purposes, but may also be suitable for simple games.
-* It includes a number of drawing options including wireframe, vector with support for sprites and viewports.
-*
-* @class Render
-*/
+ * The `Matter.Render` module is a simple HTML5 canvas based renderer for visualising instances of `Matter.Engine`.
+ * It is intended for development and debugging purposes, but may also be suitable for simple games.
+ * It includes a number of drawing options including wireframe, vector with support for sprites and viewports.
+ *
+ * @class Render
+ */
 
 var Render = {};
 
@@ -8349,18 +8360,22 @@ var Grid = _dereq_('../collision/Grid');
 var Vector = _dereq_('../geometry/Vector');
 var Mouse = _dereq_('../core/Mouse');
 
-(function() {
+(function () {
 
     var _requestAnimationFrame,
         _cancelAnimationFrame;
 
     if (typeof window !== 'undefined') {
         _requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame
-                                      || window.mozRequestAnimationFrame || window.msRequestAnimationFrame
-                                      || function(callback){ window.setTimeout(function() { callback(Common.now()); }, 1000 / 60); };
+            || window.mozRequestAnimationFrame || window.msRequestAnimationFrame
+            || function (callback) {
+                window.setTimeout(function () {
+                    callback(Common.now());
+                }, 1000 / 60);
+            };
 
         _cancelAnimationFrame = window.cancelAnimationFrame || window.mozCancelAnimationFrame
-                                      || window.webkitCancelAnimationFrame || window.msCancelAnimationFrame;
+            || window.webkitCancelAnimationFrame || window.msCancelAnimationFrame;
     }
 
     /**
@@ -8371,7 +8386,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {object} [options]
      * @return {render} A new renderer
      */
-    Render.create = function(options) {
+    Render.create = function (options) {
         var defaults = {
             controller: Render,
             engine: null,
@@ -8449,8 +8464,8 @@ var Mouse = _dereq_('../core/Mouse');
      * @method run
      * @param {render} render
      */
-    Render.run = function(render) {
-        (function loop(time){
+    Render.run = function (render) {
+        (function loop(time) {
             render.frameRequestId = _requestAnimationFrame(loop);
             Render.world(render);
         })();
@@ -8461,7 +8476,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @method stop
      * @param {render} render
      */
-    Render.stop = function(render) {
+    Render.stop = function (render) {
         _cancelAnimationFrame(render.frameRequestId);
     };
 
@@ -8472,7 +8487,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {render} render
      * @param {number} pixelRatio
      */
-    Render.setPixelRatio = function(render, pixelRatio) {
+    Render.setPixelRatio = function (render, pixelRatio) {
         var options = render.options,
             canvas = render.canvas;
 
@@ -8502,7 +8517,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {vector} [padding]
      * @param {bool} [center=true]
      */
-    Render.lookAt = function(render, objects, padding, center) {
+    Render.lookAt = function (render, objects, padding, center) {
         center = typeof center !== 'undefined' ? center : true;
         objects = Common.isArray(objects) ? objects : [objects];
         padding = padding || {
@@ -8512,8 +8527,8 @@ var Mouse = _dereq_('../core/Mouse');
 
         // find bounds of all objects
         var bounds = {
-            min: { x: Infinity, y: Infinity },
-            max: { x: -Infinity, y: -Infinity }
+            min: {x: Infinity, y: Infinity},
+            max: {x: -Infinity, y: -Infinity}
         };
 
         for (var i = 0; i < objects.length; i += 1) {
@@ -8592,7 +8607,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @method startViewTransform
      * @param {render} render
      */
-    Render.startViewTransform = function(render) {
+    Render.startViewTransform = function (render) {
         var boundsWidth = render.bounds.max.x - render.bounds.min.x,
             boundsHeight = render.bounds.max.y - render.bounds.min.y,
             boundsScaleX = boundsWidth / render.options.width,
@@ -8607,7 +8622,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @method endViewTransform
      * @param {render} render
      */
-    Render.endViewTransform = function(render) {
+    Render.endViewTransform = function (render) {
         render.context.setTransform(render.options.pixelRatio, 0, 0, render.options.pixelRatio, 0, 0);
     };
 
@@ -8617,7 +8632,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @method world
      * @param {render} render
      */
-    Render.world = function(render) {
+    Render.world = function (render) {
         var engine = render.engine,
             world = engine.world,
             canvas = render.canvas,
@@ -8751,7 +8766,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {render} render
      * @param {RenderingContext} context
      */
-    Render.debug = function(render, context) {
+    Render.debug = function (render, context) {
         var c = context,
             engine = render.engine,
             world = engine.world,
@@ -8796,7 +8811,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {constraint[]} constraints
      * @param {RenderingContext} context
      */
-    Render.constraints = function(constraints, context) {
+    Render.constraints = function (constraints, context) {
         var c = context;
 
         for (var i = 0; i < constraints.length; i++) {
@@ -8874,7 +8889,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyShadows = function(render, bodies, context) {
+    Render.bodyShadows = function (render, bodies, context) {
         var c = context,
             engine = render.engine;
 
@@ -8923,7 +8938,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodies = function(render, bodies, context) {
+    Render.bodies = function (render, bodies, context) {
         var c = context,
             engine = render.engine,
             options = render.options,
@@ -9014,6 +9029,33 @@ var Mouse = _dereq_('../core/Mouse');
                 }
 
                 c.globalAlpha = 1;
+
+                // render text
+                if (part.render.text) {
+                    //30px is default font size
+                    var fontsize = 30;
+                    //arial is default font family
+                    var fontfamily = part.render.text.family || "Arial";
+                    //white text color by default
+                    var color = part.render.text.color || "#FFFFFF";
+
+                    if (part.render.text.size)
+                        fontsize = part.render.text.size;
+                    else if (part.circleRadius)
+                        fontsize = part.circleRadius / 2;
+
+                    var content = "";
+                    if (typeof part.render.text == "string")
+                        content = part.render.text;
+                    else if (part.render.text.content)
+                        content = part.render.text.content;
+
+                    c.textBaseline = "middle";
+                    c.textAlign = "center";
+                    c.fillStyle = color;
+                    c.font = fontsize + 'px ' + fontfamily;
+                    c.fillText(content, part.position.x, part.position.y);
+                }
             }
         }
     };
@@ -9026,7 +9068,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyWireframes = function(render, bodies, context) {
+    Render.bodyWireframes = function (render, bodies, context) {
         var c = context,
             showInternalEdges = render.options.showInternalEdges,
             body,
@@ -9079,7 +9121,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyConvexHulls = function(render, bodies, context) {
+    Render.bodyConvexHulls = function (render, bodies, context) {
         var c = context,
             body,
             part,
@@ -9118,7 +9160,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.vertexNumbers = function(render, bodies, context) {
+    Render.vertexNumbers = function (render, bodies, context) {
         var c = context,
             i,
             j,
@@ -9144,7 +9186,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {mouse} mouse
      * @param {RenderingContext} context
      */
-    Render.mousePosition = function(render, mouse, context) {
+    Render.mousePosition = function (render, mouse, context) {
         var c = context;
         c.fillStyle = 'rgba(255,255,255,0.8)';
         c.fillText(mouse.position.x + '  ' + mouse.position.y, mouse.position.x + 5, mouse.position.y - 5);
@@ -9158,7 +9200,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyBounds = function(render, bodies, context) {
+    Render.bodyBounds = function (render, bodies, context) {
         var c = context,
             engine = render.engine,
             options = render.options;
@@ -9195,7 +9237,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyAxes = function(render, bodies, context) {
+    Render.bodyAxes = function (render, bodies, context) {
         var c = context,
             engine = render.engine,
             options = render.options,
@@ -9229,8 +9271,8 @@ var Mouse = _dereq_('../core/Mouse');
                     for (k = 0; k < part.axes.length; k++) {
                         // render a single axis indicator
                         c.moveTo(part.position.x, part.position.y);
-                        c.lineTo((part.vertices[0].x + part.vertices[part.vertices.length-1].x) / 2,
-                                 (part.vertices[0].y + part.vertices[part.vertices.length-1].y) / 2);
+                        c.lineTo((part.vertices[0].x + part.vertices[part.vertices.length - 1].x) / 2,
+                            (part.vertices[0].y + part.vertices[part.vertices.length - 1].y) / 2);
                     }
                 }
             }
@@ -9257,7 +9299,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyPositions = function(render, bodies, context) {
+    Render.bodyPositions = function (render, bodies, context) {
         var c = context,
             engine = render.engine,
             options = render.options,
@@ -9313,7 +9355,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyVelocity = function(render, bodies, context) {
+    Render.bodyVelocity = function (render, bodies, context) {
         var c = context;
 
         c.beginPath();
@@ -9341,7 +9383,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {body[]} bodies
      * @param {RenderingContext} context
      */
-    Render.bodyIds = function(render, bodies, context) {
+    Render.bodyIds = function (render, bodies, context) {
         var c = context,
             i,
             j;
@@ -9368,7 +9410,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {pair[]} pairs
      * @param {RenderingContext} context
      */
-    Render.collisions = function(render, pairs, context) {
+    Render.collisions = function (render, pairs, context) {
         var c = context,
             options = render.options,
             pair,
@@ -9451,7 +9493,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {pair[]} pairs
      * @param {RenderingContext} context
      */
-    Render.separations = function(render, pairs, context) {
+    Render.separations = function (render, pairs, context) {
         var c = context,
             options = render.options,
             pair,
@@ -9508,7 +9550,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {grid} grid
      * @param {RenderingContext} context
      */
-    Render.grid = function(render, grid, context) {
+    Render.grid = function (render, grid, context) {
         var c = context,
             options = render.options;
 
@@ -9530,9 +9572,9 @@ var Mouse = _dereq_('../core/Mouse');
 
             var region = bucketId.split(/C|R/);
             c.rect(0.5 + parseInt(region[1], 10) * grid.bucketWidth,
-                    0.5 + parseInt(region[2], 10) * grid.bucketHeight,
-                    grid.bucketWidth,
-                    grid.bucketHeight);
+                0.5 + parseInt(region[2], 10) * grid.bucketHeight,
+                grid.bucketWidth,
+                grid.bucketHeight);
         }
 
         c.lineWidth = 1;
@@ -9546,7 +9588,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {inspector} inspector
      * @param {RenderingContext} context
      */
-    Render.inspector = function(inspector, context) {
+    Render.inspector = function (inspector, context) {
         var engine = inspector.engine,
             selected = inspector.selected,
             render = inspector.render,
@@ -9569,34 +9611,34 @@ var Mouse = _dereq_('../core/Mouse');
             context.translate(0.5, 0.5);
             context.lineWidth = 1;
             context.strokeStyle = 'rgba(255,165,0,0.9)';
-            context.setLineDash([1,2]);
+            context.setLineDash([1, 2]);
 
             switch (item.type) {
 
-            case 'body':
+                case 'body':
 
-                // render body selections
-                bounds = item.bounds;
-                context.beginPath();
-                context.rect(Math.floor(bounds.min.x - 3), Math.floor(bounds.min.y - 3),
-                             Math.floor(bounds.max.x - bounds.min.x + 6), Math.floor(bounds.max.y - bounds.min.y + 6));
-                context.closePath();
-                context.stroke();
+                    // render body selections
+                    bounds = item.bounds;
+                    context.beginPath();
+                    context.rect(Math.floor(bounds.min.x - 3), Math.floor(bounds.min.y - 3),
+                        Math.floor(bounds.max.x - bounds.min.x + 6), Math.floor(bounds.max.y - bounds.min.y + 6));
+                    context.closePath();
+                    context.stroke();
 
-                break;
+                    break;
 
-            case 'constraint':
+                case 'constraint':
 
-                // render constraint selections
-                var point = item.pointA;
-                if (item.bodyA)
-                    point = item.pointB;
-                context.beginPath();
-                context.arc(point.x, point.y, 10, 0, 2 * Math.PI);
-                context.closePath();
-                context.stroke();
+                    // render constraint selections
+                    var point = item.pointA;
+                    if (item.bodyA)
+                        point = item.pointB;
+                    context.beginPath();
+                    context.arc(point.x, point.y, 10, 0, 2 * Math.PI);
+                    context.closePath();
+                    context.stroke();
 
-                break;
+                    break;
 
             }
 
@@ -9613,7 +9655,7 @@ var Mouse = _dereq_('../core/Mouse');
             bounds = inspector.selectBounds;
             context.beginPath();
             context.rect(Math.floor(bounds.min.x), Math.floor(bounds.min.y),
-                         Math.floor(bounds.max.x - bounds.min.x), Math.floor(bounds.max.y - bounds.min.y));
+                Math.floor(bounds.max.x - bounds.min.x), Math.floor(bounds.max.y - bounds.min.y));
             context.closePath();
             context.stroke();
             context.fill();
@@ -9632,12 +9674,16 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {} height
      * @return canvas
      */
-    var _createCanvas = function(width, height) {
+    var _createCanvas = function (width, height) {
         var canvas = document.createElement('canvas');
         canvas.width = width;
         canvas.height = height;
-        canvas.oncontextmenu = function() { return false; };
-        canvas.onselectstart = function() { return false; };
+        canvas.oncontextmenu = function () {
+            return false;
+        };
+        canvas.onselectstart = function () {
+            return false;
+        };
         return canvas;
     };
 
@@ -9648,12 +9694,12 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {HTMLElement} canvas
      * @return {Number} pixel ratio
      */
-    var _getPixelRatio = function(canvas) {
+    var _getPixelRatio = function (canvas) {
         var context = canvas.getContext('2d'),
             devicePixelRatio = window.devicePixelRatio || 1,
             backingStorePixelRatio = context.webkitBackingStorePixelRatio || context.mozBackingStorePixelRatio
-                                      || context.msBackingStorePixelRatio || context.oBackingStorePixelRatio
-                                      || context.backingStorePixelRatio || 1;
+                || context.msBackingStorePixelRatio || context.oBackingStorePixelRatio
+                || context.backingStorePixelRatio || 1;
 
         return devicePixelRatio / backingStorePixelRatio;
     };
@@ -9666,7 +9712,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {string} imagePath
      * @return {Image} texture
      */
-    var _getTexture = function(render, imagePath) {
+    var _getTexture = function (render, imagePath) {
         var image = render.textures[imagePath];
 
         if (image)
@@ -9685,7 +9731,7 @@ var Mouse = _dereq_('../core/Mouse');
      * @param {render} render
      * @param {string} background
      */
-    var _applyBackground = function(render, background) {
+    var _applyBackground = function (render, background) {
         var cssBackground = background;
 
         if (/(jpg|gif|png)$/.test(background))
@@ -9703,24 +9749,24 @@ var Mouse = _dereq_('../core/Mouse');
     */
 
     /**
-    * Fired before rendering
-    *
-    * @event beforeRender
-    * @param {} event An event object
-    * @param {number} event.timestamp The engine.timing.timestamp of the event
-    * @param {} event.source The source object of the event
-    * @param {} event.name The name of the event
-    */
+     * Fired before rendering
+     *
+     * @event beforeRender
+     * @param {} event An event object
+     * @param {number} event.timestamp The engine.timing.timestamp of the event
+     * @param {} event.source The source object of the event
+     * @param {} event.name The name of the event
+     */
 
     /**
-    * Fired after rendering
-    *
-    * @event afterRender
-    * @param {} event An event object
-    * @param {number} event.timestamp The engine.timing.timestamp of the event
-    * @param {} event.source The source object of the event
-    * @param {} event.name The name of the event
-    */
+     * Fired after rendering
+     *
+     * @event afterRender
+     * @param {} event An event object
+     * @param {number} event.timestamp The engine.timing.timestamp of the event
+     * @param {} event.source The source object of the event
+     * @param {} event.name The name of the event
+     */
 
     /*
     *
